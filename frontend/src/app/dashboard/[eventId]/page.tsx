@@ -28,14 +28,23 @@ import {
     onSnapshot,
     query,
     orderBy,
-    serverTimestamp
+    serverTimestamp,
+    updateDoc,
+    arrayUnion
 } from "firebase/firestore";
+
+interface ScheduleItem {
+    id: string;
+    time: string;
+    activity: string;
+}
 
 interface WeddingEvent {
     id: string;
     name: string;
     date: string;
     location: string;
+    schedule?: ScheduleItem[];
 }
 
 interface Guest {
@@ -64,6 +73,13 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
         passes: 1,
         status: "Pendiente" as const
     });
+
+    // Schedule Form
+    const [scheduleForm, setScheduleForm] = useState({
+        time: "",
+        activity: ""
+    });
+    const [addingSchedule, setAddingSchedule] = useState(false);
 
     useEffect(() => {
         if (!eventId) return;
@@ -112,6 +128,58 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
         } catch (error) {
             console.error("Error adding guest:", error);
             alert("Error al agregar invitado");
+        }
+    };
+
+    const handleAddScheduleItem = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAddingSchedule(true);
+        try {
+            const newItem: ScheduleItem = {
+                id: Date.now().toString(),
+                time: scheduleForm.time,
+                activity: scheduleForm.activity
+            };
+
+            const eventRef = doc(db, "events", eventId);
+            await updateDoc(eventRef, {
+                schedule: arrayUnion(newItem)
+            });
+
+            // Update local state optimistically
+            setEvent(prev => prev ? {
+                ...prev,
+                schedule: [...(prev.schedule || []), newItem].sort((a, b) => a.time.localeCompare(b.time))
+            } : null);
+
+            setScheduleForm({ time: "", activity: "" });
+        } catch (error) {
+            console.error("Error adding schedule item:", error);
+            alert("Error al guardar actividad");
+        } finally {
+            setAddingSchedule(false);
+        }
+    };
+
+    const handleDeleteScheduleItem = async (itemId: string) => {
+        if (!confirm("¿Eliminar esta actividad?")) return;
+
+        // Note: arrayRemove requires the EXACT object to remove. 
+        // Since we might not have the exact object reference easily if modified elsewhere, 
+        // a safer way usually implies reading the doc, filtering, and writing back.
+        // For simplicity with this structure, let's try reading-modifying-writing entire array 
+        // or just filtering local if we want to be quick, but let's do it right.
+
+        const newSchedule = event?.schedule?.filter(i => i.id !== itemId) || [];
+
+        try {
+            const eventRef = doc(db, "events", eventId);
+            await updateDoc(eventRef, {
+                schedule: newSchedule
+            });
+            setEvent(prev => prev ? { ...prev, schedule: newSchedule } : null);
+        } catch (e) {
+            console.error("Error deleting item", e);
         }
     };
 
@@ -367,14 +435,65 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                             </div>
                         </div>
 
-                        <div className="bg-gradient-to-br from-rose-500 to-rose-600 p-8 rounded-2xl text-white shadow-lg space-y-4 flex flex-col justify-center">
-                            <h3 className="text-2xl font-bold">Invitación Digital</h3>
-                            <p className="opacity-90">Pronto podrás generar enlaces personalizados para que tus invitados confirmen su asistencia línea.</p>
-                            <div className="pt-4">
-                                <span className="bg-white/20 px-4 py-2 rounded-full text-sm font-bold backdrop-blur-sm">
-                                    PRÓXIMAMENTE
-                                </span>
+                        <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+                            <h3 className="text-xl font-bold text-gray-800 border-b pb-4 flex items-center gap-2">
+                                <Clock className="text-rose-600" size={24} /> Cronograma del Evento
+                            </h3>
+
+                            {/* Schedule List */}
+                            <div className="space-y-4">
+                                {event.schedule && event.schedule.length > 0 ? (
+                                    event.schedule.sort((a, b) => a.time.localeCompare(b.time)).map((item) => (
+                                        <div key={item.id} className="flex items-center gap-4 p-3 hover:bg-gray-50 rounded-lg group transition">
+                                            <div className="bg-rose-100 text-rose-700 font-bold px-3 py-1 rounded-md text-sm min-w-[4rem] text-center">
+                                                {item.time}
+                                            </div>
+                                            <div className="flex-1 font-medium text-gray-700">
+                                                {item.activity}
+                                            </div>
+                                            <button
+                                                onClick={() => handleDeleteScheduleItem(item.id)}
+                                                className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition p-1"
+                                            >
+                                                <XCircle size={18} />
+                                            </button>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-gray-400 italic text-sm text-center py-4">
+                                        No hay actividades registradas.
+                                    </p>
+                                )}
                             </div>
+
+                            {/* Add Schedule Form */}
+                            <form onSubmit={handleAddScheduleItem} className="pt-4 border-t border-gray-100">
+                                <p className="text-sm font-bold text-gray-700 mb-3">Agregar Actividad</p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="time"
+                                        required
+                                        value={scheduleForm.time}
+                                        onChange={e => setScheduleForm({ ...scheduleForm, time: e.target.value })}
+                                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none w-32"
+                                    />
+                                    <input
+                                        type="text"
+                                        required
+                                        placeholder="Ej. Ceremonia, Baile..."
+                                        value={scheduleForm.activity}
+                                        onChange={e => setScheduleForm({ ...scheduleForm, activity: e.target.value })}
+                                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-rose-500 outline-none flex-1"
+                                    />
+                                    <button
+                                        type="submit"
+                                        disabled={addingSchedule}
+                                        className="bg-gray-900 text-white p-2 rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
+                                    >
+                                        {addingSchedule ? <Loader2 size={18} className="animate-spin" /> : <Plus size={18} />}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 )}

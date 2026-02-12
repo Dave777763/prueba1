@@ -16,12 +16,19 @@ import {
 import QRCode from "react-qr-code";
 import AddToCalendar from "@/components/AddToCalendar";
 
+interface ScheduleItem {
+    id: string;
+    time: string;
+    activity: string;
+}
+
 interface WeddingEvent {
     id: string;
     name: string;
     date: string;
     location: string;
     mapUrl?: string;
+    schedule?: ScheduleItem[];
 }
 
 interface Guest {
@@ -180,6 +187,34 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
                             </div>
                         </div>
                     </div>
+
+                    {/* Timeline / Cronograma */}
+                    {event.schedule && event.schedule.length > 0 && (
+                        <>
+                            <hr className="border-rose-100" />
+                            <div className="space-y-6">
+                                <h3 className="text-center text-xl font-bold text-gray-800 font-serif">Itinerario</h3>
+                                <div className="space-y-0 relative before:absolute before:inset-0 before:ml-2.5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-rose-200 before:to-transparent">
+                                    {event.schedule.sort((a, b) => a.time.localeCompare(b.time)).map((item) => (
+                                        <div key={item.id} className="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active mb-8 last:mb-0">
+                                            {/* Icon/Dot */}
+                                            <div className="flex items-center justify-center w-5 h-5 rounded-full border border-white bg-rose-50 shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10">
+                                                <div className="w-2 h-2 bg-rose-500 rounded-full"></div>
+                                            </div>
+
+                                            {/* Content */}
+                                            <div className="w-[calc(100%-2.5rem)] md:w-[calc(50%-2.5rem)] p-4 bg-white border border-rose-50 rounded-xl shadow-sm">
+                                                <div className="flex items-center justify-between space-x-2 mb-1">
+                                                    <div className="font-bold text-gray-900">{item.activity}</div>
+                                                    <time className="font-mono text-xs text-rose-500">{item.time}</time>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </>
+                    )}
 
                     <hr className="border-rose-100" />
 
