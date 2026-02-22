@@ -52,6 +52,7 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
     const [submitting, setSubmitting] = useState(false);
     const [rsvpDone, setRsvpDone] = useState(false);
     const [selectedPasses, setSelectedPasses] = useState(1);
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     const loading = eventLoading || guestLoading;
 
@@ -70,6 +71,7 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
             },
             (error) => {
                 console.error("Error loading event:", error);
+                setErrorMsg(`Error al cargar evento: ${error.message}`);
                 setEventLoading(false);
             }
         );
@@ -90,6 +92,7 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
             },
             (error) => {
                 console.error("Error loading guest:", error);
+                setErrorMsg(prev => prev ? prev + ` | Error al cargar invitado: ${error.message}` : `Error al cargar invitado: ${error.message}`);
                 setGuestLoading(false);
             }
         );
@@ -128,12 +131,30 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
         );
     }
 
+    if (errorMsg) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
+                <XCircle size={60} className="text-red-500 mb-4" />
+                <h1 className="text-2xl font-bold text-gray-800">Error de conexión</h1>
+                <p className="text-gray-500 mt-2">Detalles del error: {errorMsg}</p>
+                <p className="text-xs text-gray-400 mt-4 break-all max-w-md">Por favor verifica la configuración de variables de entorno de Firebase en Vercel.</p>
+            </div>
+        );
+    }
+
     if (!event || !guest) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-6 text-center bg-gray-50">
                 <XCircle size={60} className="text-gray-300 mb-4" />
                 <h1 className="text-2xl font-bold text-gray-800">Invitación no encontrada</h1>
                 <p className="text-gray-500 mt-2">El enlace parece ser inválido o el evento ya no está disponible.</p>
+                <div className="mt-8 text-left text-xs text-gray-400 bg-white p-4 rounded shadow-sm border border-gray-100 break-all max-w-sm">
+                    <strong>Información de depuración:</strong>
+                    <br />Event ID buscado: <code>{eventId}</code>
+                    <br />Event Encontrado: <code>{event ? 'Sí' : 'No'}</code>
+                    <br />Guest ID buscado: <code>{guestId}</code>
+                    <br />Guest Encontrado: <code>{guest ? 'Sí' : 'No'}</code>
+                </div>
             </div>
         );
     }
