@@ -17,7 +17,11 @@ import {
     XCircle,
     Copy,
     Share2,
-    QrCode
+    QrCode,
+    Palette,
+    Heart,
+    ExternalLink,
+    FileImage
 } from "lucide-react";
 import { db } from "@/lib/firebase";
 import {
@@ -32,6 +36,10 @@ import {
     updateDoc,
     arrayUnion
 } from "firebase/firestore";
+import ThemeSelector from "@/components/ThemeSelector";
+import { getTheme } from "@/lib/themes";
+import InvitationGenerator from "@/components/InvitationGenerator";
+
 
 interface ScheduleItem {
     id: string;
@@ -45,6 +53,7 @@ interface WeddingEvent {
     date: string;
     location: string;
     schedule?: ScheduleItem[];
+    theme?: string;
 }
 
 interface Guest {
@@ -61,7 +70,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
     const { eventId } = use(params);
     const router = useRouter();
     const [event, setEvent] = useState<WeddingEvent | null>(null);
-    const [activeTab, setActiveTab] = useState<"general" | "invitados" | "config">("invitados");
+    const [activeTab, setActiveTab] = useState<"general" | "invitados" | "config" | "disenar">("invitados");
     const [loading, setLoading] = useState(true);
     const [guests, setGuests] = useState<Guest[]>([]);
     const [isAddGuestModalOpen, setIsAddGuestModalOpen] = useState(false);
@@ -84,10 +93,9 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
     useEffect(() => {
         if (!eventId) return;
 
-        // Cargar datos del evento
-        const fetchEvent = async () => {
-            const docRef = doc(db, "events", eventId);
-            const docSnap = await getDoc(docRef);
+        // Escuchar el evento en tiempo real
+        const eventRef = doc(db, "events", eventId);
+        const unsubscribeEvent = onSnapshot(eventRef, (docSnap) => {
             if (docSnap.exists()) {
                 setEvent({ id: docSnap.id, ...docSnap.data() } as WeddingEvent);
             } else {
@@ -95,9 +103,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                 router.push("/dashboard");
             }
             setLoading(false);
-        };
-
-        fetchEvent();
+        }, (error) => {
+            console.error("Error fetching event:", error);
+            setLoading(false);
+        });
 
         // Escuchar invitados en tiempo real
         const guestsQuery = query(
@@ -105,7 +114,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
             orderBy("name", "asc")
         );
 
-        const unsubscribe = onSnapshot(guestsQuery, (snapshot) => {
+        const unsubscribeGuests = onSnapshot(guestsQuery, (snapshot) => {
             const list = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
@@ -113,7 +122,10 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
             setGuests(list);
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribeEvent();
+            unsubscribeGuests();
+        };
     }, [eventId, router]);
 
     const handleAddGuest = async (e: React.FormEvent) => {
@@ -146,12 +158,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                 schedule: arrayUnion(newItem)
             });
 
-            // Update local state optimistically
-            setEvent(prev => prev ? {
-                ...prev,
-                schedule: [...(prev.schedule || []), newItem].sort((a, b) => a.time.localeCompare(b.time))
-            } : null);
-
+            // Ya no necesitamos setEvent manual aquí, 
+            // onSnapshot se encarga de actualizarlo solo.
             setScheduleForm({ time: "", activity: "" });
         } catch (error) {
             console.error("Error adding schedule item:", error);
@@ -177,34 +185,45 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
             await updateDoc(eventRef, {
                 schedule: newSchedule
             });
-            setEvent(prev => prev ? { ...prev, schedule: newSchedule } : null);
+            // onSnapshot actualizará el estado automáticamente
         } catch (e) {
             console.error("Error deleting item", e);
         }
     };
 
+    const getBaseUrl = () => {
+        // Si tienes una URL de producción configurada, úsala. 
+        // Si no, usa el origen actual.
+        return process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+    };
+
     const copyInvitationLink = (guestId: string) => {
-        const link = `${window.location.origin}/invitacion/${eventId}/${guestId}`;
+        const link = `${getBaseUrl()}/invitacion/${eventId}/${guestId}`;
         navigator.clipboard.writeText(link);
-        alert("¡Enlace de invitación copiado al portapapeles!");
+        alert("¡Enlace de invitación copiado!");
     };
 
     const shareInvitation = async (guest: Guest) => {
-        const link = `${window.location.origin}/invitacion/${eventId}/${guest.id}`;
-        const message = `¡Hola ${guest.name}! 👋\n\nTe invitamos cordialmente a nuestro evento: *${event?.name}* 🥂\n\nAquí puedes ver todos los detalles y confirmar tu asistencia:\n${link}\n\n¡Esperamos contar con tu presencia!`;
+        const link = `${getBaseUrl()}/invitacion/${eventId}/${guest.id}`;
+
+        // Mensaje optimizado para WhatsApp (con asteriscos para negritas y saltos de línea)
+        const message = `*¡Hola ${guest.name}!* 👋\n\nTe invitamos cordialmente a nuestro evento:\n*${event?.name.toUpperCase()}* 🥂\n\nPresiona el siguiente enlace para ver el itinerario, la ubicación y confirmar tu asistencia:\n\n${link}\n\n¡Esperamos verte ahí! ✨`;
 
         if (navigator.share) {
             try {
                 await navigator.share({
-                    title: `Invitación para ${event?.name}`,
+                    title: `Invitación: ${event?.name}`,
                     text: message,
-                    url: link,
                 });
             } catch (err) {
                 console.log('Error sharing:', err);
             }
         } else {
-            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            // Detect mobile vs desktop for proper WhatsApp URL
+            const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const whatsappUrl = isMobile
+                ? `https://wa.me/?text=${encodeURIComponent(message)}`
+                : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
         }
     };
@@ -250,12 +269,18 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
 
             <main className="max-w-6xl mx-auto px-4 py-8">
                 {/* Tabs */}
-                <div className="flex gap-1 bg-white p-1 rounded-xl border border-gray-200 mb-8 max-w-fit shadow-sm">
+                <div className="flex gap-1 bg-white p-1 rounded-xl border border-gray-200 mb-8 max-w-fit shadow-sm flex-wrap">
                     <button
                         onClick={() => setActiveTab("invitados")}
                         className={`px-6 py-2 rounded-lg flex items-center gap-2 font-medium transition ${activeTab === "invitados" ? "bg-rose-50 text-rose-600 shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}
                     >
                         <Users size={18} /> Invitados
+                    </button>
+                    <button
+                        onClick={() => setActiveTab("disenar")}
+                        className={`px-6 py-2 rounded-lg flex items-center gap-2 font-medium transition ${activeTab === "disenar" ? "bg-purple-50 text-purple-600 shadow-sm" : "text-gray-500 hover:bg-gray-50"}`}
+                    >
+                        <FileImage size={18} /> Diseñar Invitación
                     </button>
                     <button
                         onClick={() => setActiveTab("general")}
@@ -404,6 +429,44 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                     </div>
                 )}
 
+                {activeTab === "disenar" && (
+                    <div className="space-y-6">
+                        <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                            <div className="p-6 bg-gradient-to-r from-purple-50 via-rose-50 to-amber-50 border-b border-gray-100">
+                                <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                    <FileImage size={24} className="text-purple-600" />
+                                    Generador de Invitaciones
+                                </h3>
+                                <p className="text-sm text-gray-600 mt-1">
+                                    Crea invitaciones personalizadas para bodas, quinceaños, cumpleaños y más. Incluye el QR de cada invitado.
+                                </p>
+                            </div>
+                            <div className="p-6">
+                                {guests.length > 0 ? (
+                                    <InvitationGenerator
+                                        eventId={eventId}
+                                        eventName={event.name}
+                                        eventDate={event.date}
+                                        eventLocation={event.location}
+                                        guests={guests}
+                                    />
+                                ) : (
+                                    <div className="text-center py-12">
+                                        <Users size={48} className="mx-auto text-gray-300 mb-4" />
+                                        <p className="text-gray-500 font-medium">Primero agrega invitados para generar invitaciones.</p>
+                                        <button
+                                            onClick={() => { setActiveTab("invitados"); setIsAddGuestModalOpen(true); }}
+                                            className="mt-4 px-6 py-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition font-bold shadow-lg shadow-rose-100"
+                                        >
+                                            Agregar Invitados
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === "general" && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
@@ -498,20 +561,111 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                     </div>
                 )}
 
+
                 {activeTab === "config" && (
-                    <div className="max-w-2xl bg-white rounded-2xl border border-rose-100 overflow-hidden shadow-sm">
-                        <div className="p-6 bg-rose-50 border-b border-rose-100">
-                            <h3 className="text-xl font-bold text-rose-900">Configuración Avanzada</h3>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="font-bold text-gray-800">Eliminar Evento</p>
-                                    <p className="text-sm text-gray-500">Esta acción no se puede deshacer y borrará todos los invitados.</p>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                            {/* Selector de Temas */}
+                            <div className="lg:col-span-2 space-y-6">
+                                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+                                    <div className="p-6 bg-gradient-to-r from-rose-50 to-purple-50 border-b border-gray-100">
+                                        <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                                            <Palette size={24} className="text-rose-600" />
+                                            Temas de Invitación
+                                        </h3>
+                                        <p className="text-sm text-gray-600 mt-1">Elige el estilo visual que verán tus invitados</p>
+                                    </div>
+                                    <div className="p-6">
+                                        <ThemeSelector eventId={eventId} currentTheme={event.theme || 'romantic-rose'} />
+                                    </div>
                                 </div>
-                                <button className="px-4 py-2 bg-rose-50 text-rose-600 rounded-lg font-bold border border-rose-100 hover:bg-rose-100 transition">
-                                    Eliminar
-                                </button>
+                            </div>
+
+                            {/* Vista Previa */}
+                            <div className="space-y-6">
+                                <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm sticky top-24">
+                                    <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                                        <h3 className="font-bold text-gray-700">Vista Previa</h3>
+                                        <div className="px-2 py-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded uppercase tracking-wider">
+                                            En Vivo
+                                        </div>
+                                    </div>
+                                    <div className="p-6 flex justify-center bg-gray-100">
+                                        {/* Mock Invitation Card */}
+                                        <div
+                                            className="w-full max-w-[280px] rounded-2xl shadow-xl overflow-hidden bg-white border border-gray-200 transform scale-90 origin-top"
+                                            style={{
+                                                fontFamily: getTheme(event.theme || 'romantic-rose').fonts.body,
+                                                backgroundColor: getTheme(event.theme || 'romantic-rose').colors.background
+                                            }}
+                                        >
+                                            <div className="p-6 text-center space-y-4">
+                                                <div
+                                                    className="inline-block p-2 rounded-full"
+                                                    style={{
+                                                        backgroundColor: getTheme(event.theme || 'romantic-rose').colors.primaryLight,
+                                                        color: getTheme(event.theme || 'romantic-rose').colors.primary
+                                                    }}
+                                                >
+                                                    <Heart size={20} fill="currentColor" />
+                                                </div>
+                                                <h4
+                                                    className="text-xl font-bold"
+                                                    style={{
+                                                        fontFamily: getTheme(event.theme || 'romantic-rose').fonts.heading,
+                                                        color: getTheme(event.theme || 'romantic-rose').colors.text
+                                                    }}
+                                                >
+                                                    {event.name}
+                                                </h4>
+                                                <p
+                                                    className="italic text-lg"
+                                                    style={{
+                                                        fontFamily: getTheme(event.theme || 'romantic-rose').fonts.accent,
+                                                        color: getTheme(event.theme || 'romantic-rose').colors.accent
+                                                    }}
+                                                >
+                                                    ¡Nos casamos!
+                                                </p>
+                                                <div
+                                                    className="py-2 px-4 rounded-xl text-xs font-bold"
+                                                    style={{
+                                                        backgroundColor: getTheme(event.theme || 'romantic-rose').colors.primary,
+                                                        color: 'white'
+                                                    }}
+                                                >
+                                                    Confirmar Asistencia
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 text-center">
+                                        <button
+                                            onClick={() => window.open(`/invitacion/${eventId}/preview`, '_blank')}
+                                            className="text-sm text-rose-600 font-bold hover:underline flex items-center justify-center gap-1 mx-auto"
+                                        >
+                                            Ver pantalla completa <ExternalLink size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Configuración Avanzada */}
+                        <div className="bg-white rounded-2xl border border-rose-100 overflow-hidden shadow-sm">
+                            <div className="p-6 bg-rose-50 border-b border-rose-100">
+                                <h3 className="text-xl font-bold text-rose-900">Configuración Avanzada</h3>
+                            </div>
+                            <div className="p-6 space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-gray-800">Eliminar Evento</p>
+                                        <p className="text-sm text-gray-500">Esta acción no se puede deshacer y borrará todos los invitados.</p>
+                                    </div>
+                                    <button className="px-4 py-2 bg-rose-50 text-rose-600 rounded-lg font-bold border border-rose-100 hover:bg-rose-100 transition">
+                                        Eliminar
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
