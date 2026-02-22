@@ -18,6 +18,31 @@ interface TimeRemaining {
     seconds: number;
 }
 
+const TimeUnit = ({ value, label, theme }: { value: number; label: string; theme?: CountdownProps['theme'] }) => (
+    <div
+        className="flex flex-col items-center p-4 rounded-2xl shadow-lg transition-all duration-300 hover:scale-105"
+        style={{
+            backgroundColor: theme?.primaryLight || '#ffe4e6',
+            borderWidth: '2px',
+            borderColor: theme?.primary || '#be123c',
+            borderStyle: 'solid',
+        }}
+    >
+        <div
+            className="text-4xl md:text-5xl font-bold tabular-nums leading-none mb-2"
+            style={{ color: theme?.primary || '#be123c' }}
+        >
+            {value.toString().padStart(2, '0')}
+        </div>
+        <div
+            className="text-xs md:text-sm font-medium uppercase tracking-wider"
+            style={{ color: theme?.text || '#6b7280' }}
+        >
+            {label}
+        </div>
+    </div>
+);
+
 export default function Countdown({ targetDate, theme }: CountdownProps) {
     const [timeRemaining, setTimeRemaining] = useState<TimeRemaining>({
         days: 0,
@@ -48,31 +73,6 @@ export default function Countdown({ targetDate, theme }: CountdownProps) {
         return () => clearInterval(interval);
     }, [targetDate]);
 
-    const TimeUnit = ({ value, label }: { value: number; label: string }) => (
-        <div
-            className="flex flex-col items-center p-4 rounded-2xl shadow-lg transition-all duration-300 hover:scale-105"
-            style={{
-                backgroundColor: theme?.primaryLight || '#ffe4e6',
-                borderWidth: '2px',
-                borderColor: theme?.primary || '#be123c',
-                borderStyle: 'solid',
-            }}
-        >
-            <div
-                className="text-4xl md:text-5xl font-bold tabular-nums leading-none mb-2"
-                style={{ color: theme?.primary || '#be123c' }}
-            >
-                {value.toString().padStart(2, '0')}
-            </div>
-            <div
-                className="text-xs md:text-sm font-medium uppercase tracking-wider"
-                style={{ color: theme?.text || '#6b7280' }}
-            >
-                {label}
-            </div>
-        </div>
-    );
-
     return (
         <div className="w-full">
             <div className="text-center mb-6">
@@ -84,10 +84,10 @@ export default function Countdown({ targetDate, theme }: CountdownProps) {
                 </p>
             </div>
             <div className="grid grid-cols-4 gap-3 md:gap-4">
-                <TimeUnit value={timeRemaining.days} label="Días" />
-                <TimeUnit value={timeRemaining.hours} label="Horas" />
-                <TimeUnit value={timeRemaining.minutes} label="Min" />
-                <TimeUnit value={timeRemaining.seconds} label="Seg" />
+                <TimeUnit value={timeRemaining.days} label="Días" theme={theme} />
+                <TimeUnit value={timeRemaining.hours} label="Horas" theme={theme} />
+                <TimeUnit value={timeRemaining.minutes} label="Min" theme={theme} />
+                <TimeUnit value={timeRemaining.seconds} label="Seg" theme={theme} />
             </div>
         </div>
     );

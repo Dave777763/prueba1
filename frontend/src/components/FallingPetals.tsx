@@ -20,18 +20,22 @@ export default function FallingPetals({ color = '#fda4af', count = 30 }: Falling
     const [petals, setPetals] = useState<Petal[]>([]);
 
     useEffect(() => {
-        const newPetals: Petal[] = [];
-        for (let i = 0; i < count; i++) {
-            newPetals.push({
-                id: i,
-                left: Math.random() * 100,
-                animationDuration: 8 + Math.random() * 10,
-                animationDelay: Math.random() * 5,
-                size: 8 + Math.random() * 12,
-                opacity: 0.3 + Math.random() * 0.4,
-            });
-        }
-        setPetals(newPetals);
+        const timer = setTimeout(() => {
+            const newPetals: Petal[] = [];
+            for (let i = 0; i < count; i++) {
+                newPetals.push({
+                    id: i,
+                    left: Math.random() * 100,
+                    animationDuration: 8 + Math.random() * 10,
+                    animationDelay: Math.random() * 5,
+                    size: 8 + Math.random() * 12,
+                    opacity: 0.3 + Math.random() * 0.4,
+                });
+            }
+            setPetals(newPetals);
+        }, 0);
+
+        return () => clearTimeout(timer);
     }, [count]);
 
     return (

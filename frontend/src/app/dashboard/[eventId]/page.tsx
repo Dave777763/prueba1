@@ -63,7 +63,7 @@ interface Guest {
     passes: number;
     status: "Confirmado" | "Pendiente" | "Declinado";
     attended?: boolean;
-    attendedAt?: any;
+    attendedAt?: unknown;
 }
 
 export default function EventDetailPage({ params }: { params: Promise<{ eventId: string }> }) {
@@ -80,7 +80,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
         name: "",
         group: "",
         passes: 1,
-        status: "Pendiente" as const
+        status: "Pendiente" as "Confirmado" | "Pendiente" | "Declinado"
     });
 
     // Schedule Form
@@ -720,7 +720,7 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
                                         <label className="block text-sm font-bold text-gray-700 mb-1">Estatus</label>
                                         <select
                                             value={guestForm.status}
-                                            onChange={(e) => setGuestForm({ ...guestForm, status: e.target.value as any })}
+                                            onChange={(e) => setGuestForm({ ...guestForm, status: e.target.value as "Confirmado" | "Pendiente" | "Declinado" })}
                                             className="w-full px-4 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-rose-500 outline-none transition bg-white"
                                         >
                                             <option value="Pendiente">Pendiente</option>

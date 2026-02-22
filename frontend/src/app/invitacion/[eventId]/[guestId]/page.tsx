@@ -47,34 +47,52 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
     const { eventId, guestId } = use(params);
     const [event, setEvent] = useState<WeddingEvent | null>(null);
     const [guest, setGuest] = useState<Guest | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [eventLoading, setEventLoading] = useState(true);
+    const [guestLoading, setGuestLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [rsvpDone, setRsvpDone] = useState(false);
     const [selectedPasses, setSelectedPasses] = useState(1);
+
+    const loading = eventLoading || guestLoading;
 
     // Get theme colors
     const theme = event ? getTheme(event.theme || 'romantic-rose') : getTheme('romantic-rose');
 
     useEffect(() => {
         // Escuchar el evento en tiempo real
-        const unsubscribeEvent = onSnapshot(doc(db, "events", eventId), (eventSnap) => {
-            if (eventSnap.exists()) {
-                setEvent({ id: eventSnap.id, ...eventSnap.data() } as WeddingEvent);
+        const unsubscribeEvent = onSnapshot(
+            doc(db, "events", eventId),
+            (eventSnap) => {
+                if (eventSnap.exists()) {
+                    setEvent({ id: eventSnap.id, ...eventSnap.data() } as WeddingEvent);
+                }
+                setEventLoading(false);
+            },
+            (error) => {
+                console.error("Error loading event:", error);
+                setEventLoading(false);
             }
-        });
+        );
 
         // Escuchar el invitado en tiempo real
-        const unsubscribeGuest = onSnapshot(doc(db, "events", eventId, "guests", guestId), (guestSnap) => {
-            if (guestSnap.exists()) {
-                const guestData = { id: guestSnap.id, ...guestSnap.data() } as Guest;
-                setGuest(guestData);
-                setSelectedPasses(guestData.passes);
-                if (guestData.status !== "Pendiente") {
-                    setRsvpDone(true);
+        const unsubscribeGuest = onSnapshot(
+            doc(db, "events", eventId, "guests", guestId),
+            (guestSnap) => {
+                if (guestSnap.exists()) {
+                    const guestData = { id: guestSnap.id, ...guestSnap.data() } as Guest;
+                    setGuest(guestData);
+                    setSelectedPasses(guestData.passes);
+                    if (guestData.status !== "Pendiente") {
+                        setRsvpDone(true);
+                    }
                 }
+                setGuestLoading(false);
+            },
+            (error) => {
+                console.error("Error loading guest:", error);
+                setGuestLoading(false);
             }
-            setLoading(false);
-        });
+        );
 
         return () => {
             unsubscribeEvent();

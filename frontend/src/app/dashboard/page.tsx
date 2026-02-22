@@ -12,7 +12,7 @@ interface WeddingEvent {
     date: string;
     location: string;
     mapUrl?: string;
-    createdAt?: any;
+    createdAt?: unknown;
 }
 
 export default function DashboardPage() {
@@ -96,9 +96,9 @@ export default function DashboardPage() {
             // Opcional: Podríamos disparar un refresh de los datos aquí
             // Por ahora, solo cerramos el modal
             alert("¡Evento guardado con éxito en Firebase!");
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("ERROR DETALLADO de Firebase:", error);
-            alert(`Error al guardar: ${error.message || "Revisa la consola"}`);
+            alert(`Error al guardar: ${error instanceof Error ? error.message : "Revisa la consola"}`);
         } finally {
             setLoading(false);
         }
