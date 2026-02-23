@@ -210,13 +210,18 @@ export default function InvitationGenerator({
                 `📎 *Tu invitación personalizada se descargó como imagen, adjúntala a este mensaje.*\n\n` +
                 `¡Te esperamos! ✨`;
 
+            // Copy to clipboard as a fallback for WhatsApp Desktop bugs where the text input opens blank
+            try {
+                await navigator.clipboard.writeText(message);
+            } catch (clipboardError) {
+                console.warn("Could not copy to clipboard automatically:", clipboardError);
+            }
+
             // Determine if we're on mobile or desktop
             const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-            // Use WhatsApp Web for desktop, wa.me for mobile
-            const whatsappUrl = isMobile
-                ? `https://wa.me/?text=${encodeURIComponent(message)}`
-                : `https://web.whatsapp.com/send?text=${encodeURIComponent(message)}`;
+            // Use the universal api.whatsapp.com link, it intelligently routes to app or web and avoids the desktop blank text bug
+            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(message)}`;
 
             // Small delay to let the download start
             setTimeout(() => {
