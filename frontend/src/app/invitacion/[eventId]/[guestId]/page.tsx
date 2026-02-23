@@ -66,6 +66,8 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
             (eventSnap) => {
                 if (eventSnap.exists()) {
                     setEvent({ id: eventSnap.id, ...eventSnap.data() } as WeddingEvent);
+                } else {
+                    console.log("El evento no existe en Firebase.");
                 }
                 setEventLoading(false);
             },
@@ -87,6 +89,8 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
                     if (guestData.status !== "Pendiente") {
                         setRsvpDone(true);
                     }
+                } else {
+                    console.log("El invitado no existe en Firebase.");
                 }
                 setGuestLoading(false);
             },
