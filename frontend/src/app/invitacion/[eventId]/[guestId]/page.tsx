@@ -122,6 +122,14 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
         }
     };
 
+    // Google Maps Link Logic
+    // If mapUrl exists, use it directly. Otherwise, search by location name.
+    const mapLink = event?.mapUrl
+        ? event.mapUrl
+        : event?.location
+            ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`
+            : "#";
+
     if (loading) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen bg-rose-50/30">
@@ -158,12 +166,6 @@ export default function InvitationPage({ params }: { params: Promise<{ eventId: 
             </div>
         );
     }
-
-    // Google Maps Link Logic
-    // If mapUrl exists, use it directly. Otherwise, search by location name.
-    const mapLink = event.mapUrl
-        ? event.mapUrl
-        : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
 
     return (
         <div
