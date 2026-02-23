@@ -194,7 +194,8 @@ export default function EventDetailPage({ params }: { params: Promise<{ eventId:
     const getBaseUrl = () => {
         // Si tienes una URL de producción configurada, úsala. 
         // Si no, usa el origen actual.
-        return process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        const url = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        return url.trim();
     };
 
     const copyInvitationLink = (guestId: string) => {

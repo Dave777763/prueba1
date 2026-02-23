@@ -131,7 +131,8 @@ export default function InvitationGenerator({
     }, [currentGuest?.name]);
 
     const getBaseUrl = () => {
-        return process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        const url = process.env.NEXT_PUBLIC_BASE_URL || window.location.origin;
+        return url.trim();
     };
 
     // Share natively (mobile) - sends image as attachment
