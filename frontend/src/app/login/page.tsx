@@ -2,11 +2,12 @@
 
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 export default function LoginPage() {
     const { user, signInWithGoogle, loading } = useAuth();
     const router = useRouter();
+    const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
     useEffect(() => {
         if (user) {
@@ -22,6 +23,20 @@ export default function LoginPage() {
         );
     }
 
+    const handleLogin = async () => {
+        setErrorMsg(null);
+        try {
+            await signInWithGoogle();
+        } catch (error: any) {
+            console.error("Login failed:", error);
+            setErrorMsg(
+                error.message.includes("auth/unauthorized-domain")
+                    ? "Este dominio no está autorizado en Firebase. Ve a Firebase Console > Authentication > Settings > Authorized domains y agrega tu dominio de Vercel."
+                    : `Error de inicio de sesión: ${error.message}`
+            );
+        }
+    }
+
     return (
         <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 px-4">
             <div className="w-full max-w-md space-y-8 rounded-xl bg-white p-10 shadow-lg">
@@ -33,9 +48,16 @@ export default function LoginPage() {
                         Accede al Dashboard de tu evento
                     </p>
                 </div>
+
+                {errorMsg && (
+                    <div className="bg-red-50 text-red-600 p-4 rounded-lg text-sm border border-red-200">
+                        {errorMsg}
+                    </div>
+                )}
+
                 <div className="mt-8 space-y-6">
                     <button
-                        onClick={signInWithGoogle}
+                        onClick={handleLogin}
                         className="group relative flex w-full justify-center rounded-md border border-transparent bg-indigo-600 px-4 py-3 text-sm font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition-colors"
                     >
                         <span className="absolute inset-y-0 left-0 flex items-center pl-3">
